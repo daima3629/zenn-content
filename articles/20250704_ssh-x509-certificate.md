@@ -5,7 +5,9 @@ type: "tech"
 topics:
   - "ssh"
   - "x509"
-published: false
+  - "pki"
+  - "証明書"
+published: true
 ---
 
 SSH の公開鍵認証において、X.509 証明書の証明チェーンで公開鍵の信頼を行いたかったのだが、OpenSSH は [X.509 証明書に対応する予定がない](https://lists.mindrot.org/pipermail/openssh-unix-dev/2022-September/040423.html)らしい。
