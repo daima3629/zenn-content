@@ -107,7 +107,48 @@ OpenSSH の service ファイルをベースに作成した。
 
 ### sshd_config の設定
 
-todo
+```conf
+Port 2222
+
+X509KeyAlgorithm x509v3-ecdsa-sha2-nistp384,ssh-sha384,ecdsa-sha2-nistp384
+X509KeyAlgorithm x509v3-ecdsa-sha2-nistp521,ssh-sha512,ecdsa-sha2-nistp521
+
+AllowedCertPurpose any
+
+PermitRootLogin no
+PasswordAuthentication no
+
+AuthorizedKeysFile      .ssh/authorized_keys
+
+# override default of no subsystems
+Subsystem       sftp    /usr/local/libexec/sftp-server
+```
+
+最低限のものだけ書いてみた。
+
+通常の sshd_config と違うのは `X509KeyAlgorithm` と `AllowedCertPurpose` ぐらいだろう。
+
+`X509KeyAlgorithm` はサーバーが受け入れる X.509 証明書認証方式の一覧を指定する。現時点でできるだけ強い暗号を使いたいと思ったので NIST P-384, P-521 系のみ有効化しているが、好きなものを使えばいい。
+
+`AllowedCertPurpose` は X.509 証明書の keyUsage, extendedKeyUsage に基づいて決定される OpenSSL の Certificate Purpose を指定する。
+[RFC6187 - 2.2 Certificate Extensions](https://datatracker.ietf.org/doc/html/rfc6187#section-2.2) によると、SSH クライアント証明書として使う場合は
+
+- keyUsage: digitalSignature
+- extendedKeyUsage: secureShellClient
+
+を指定するはずなのだが、デフォルト値である `sshclient` を満たすためには
+
+- keyUsage: digitalSignature
+- extendedKeyUsage: serverAuth
+
+となる必要があるらしい。
+
+:::details さらに細かい話
+Certificate Purpose の一覧は [openssl-verification-options - Certificate Extensions](https://docs.openssl.org/3.2/man1/openssl-verification-options/#checks-implied-by-specific-predefined-policies) に定義されている。
+これは OpenSSL 独自の証明書識別子であり、採用している理由は不明である(OpenSSL には Extended Key Usage を取得できる [X509V3_get_d2i](https://docs.openssl.org/3.2/man3/X509V3_get_d2i/) という API が用意されている)。
+:::
+
+今回は RFC6187 を優先し、`AllowedCertPurpose any` としてチェックを回避するようにする。
 
 ### 証明書のインストール
 
@@ -119,7 +160,7 @@ openssl x509 -in certificate_file_name -noout -hash
 ```
 
 NUM は基本 0 で OK。
-また、サーバー側にはルート証明書しか置く必要はない。ユーザー側が証明チェーン構築に必要なすべての証明書を提示する決まりになっているからだ。
+また、サーバー側にはルート証明書しか置く必要はない。クライアント側が証明チェーン構築に必要なすべての証明書を提示する決まりになっているからだ。
 ちなみに、ファイル名を最初からこのフォーマットにしてしまうとなんの証明書かわからなくなるので、わかりやすい名前にしてからシンボリックリンクを張るのがおすすめだ。
 
 ## クライアント側の準備
@@ -140,7 +181,7 @@ cat ~/.ssh/ssh_testuser.key ~/.ssh/ssh_testuser_cert.pem > ~/.ssh/ssh_testuser_w
 `~/.ssh/crt` にはサーバ側と同様、`[HASH].[NUM]` のフォーマットで証明書を置く。
 中間証明書も置かなくてはならないことに注意。
 
-## authorized_keys の更新
+## authorized_keys への追加
 
 サーバー側にルート証明書をインストールするだけではダメで、通常の公開鍵認証同様 `~/.ssh/authorized_keys` にエントリを追加する必要がある。
 ただし、その書き方は少々異なる。
@@ -160,4 +201,23 @@ subject=CN=testuser,O=daima3629
 x509v3-ecdsa-sha2-nistp521 subject=CN=testuser,O=daima3629
 ```
 
-こうなる。これが公開鍵の識別子となる。
+こうなる。これが公開鍵の識別子となる。これを `authorized_keys` に追記してあげればよいというわけだ。
+
+## 動作確認
+
+起動して、動作確認してみる。
+
+```sh
+$ sudo systemctl start pkixssh-sshd
+$ journalctl -xeu pkixssh-sshd
+...
+Jul 04 16:32:37 certtest.home.daima3629.com sshd[149102]: Accepted publickey for testuser from x.x.x.x port 58358 ssh2: ECDSA+cert SHA256:eGO9VwZu7+IFPzQfwru9DKpYJMwpqSl3zQJwto3sPDs
+...
+```
+
+やったね！！！
+
+## 感想
+
+あくまで OpenSSH のフォークなので楽に扱うことができた (証明書チェーンの構築方法など、詰まったところはあったが…)。
+個人開発なので企業とかで採用するのは難しそうだが、個人のサーバーでは適切に利用すれば公開鍵インストールの手間など省けるので、積極的に活用したい。
