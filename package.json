@@ -1,0 +1,23 @@
+{
+  "name": "zenn-content",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/daima3629/zenn-content#readme",
+  "bugs": {
+    "url": "https://github.com/daima3629/zenn-content/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/daima3629/zenn-content.git"
+  },
+  "license": "MIT",
+  "author": "daima3629",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "zenn-cli": "^0.1.162"
+  }
+}
